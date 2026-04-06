@@ -1,0 +1,22 @@
+[project]
+name = "oncall-engineer-env"
+version = "1.0.0"
+description = "OpenEnv environment: AI on-call engineer for production incident response"
+requires-python = ">=3.10"
+
+dependencies = [
+    "fastapi==0.115.0",
+    "uvicorn[standard]==0.29.0",
+    "websockets>=15.0.1",
+    "pydantic==2.10.0",
+    "requests==2.32.2",
+    "openai>=2.7.2",
+    "openenv-core>=0.2.0",
+]
+
+[project.scripts]
+server = "server.app:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"

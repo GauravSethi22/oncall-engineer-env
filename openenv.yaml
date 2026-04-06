@@ -1,0 +1,65 @@
+name: oncall-engineer-env
+version: "1.0.0"
+description: >
+  AI on-call engineer environment. The agent must diagnose and resolve
+  production software incidents across 3 difficulty levels — from obvious
+  crashes to silent data corruption.
+
+author: Gaurav206
+license: MIT
+
+tasks:
+  - name: easy_crash
+    difficulty: easy
+    description: Payment service crashed after a bad deployment. Find and rollback.
+    max_steps: 15
+    score_range: [0.0, 1.0]
+
+  - name: medium_cascade
+    difficulty: medium
+    description: Cascading failure caused by database connection exhaustion. Trace root cause.
+    max_steps: 20
+    score_range: [0.0, 1.0]
+
+  - name: hard_corruption
+    difficulty: hard
+    description: Silent data corruption with no alerts. Proactively investigate.
+    max_steps: 25
+    score_range: [0.0, 1.0]
+
+action_space:
+  type: structured
+  fields:
+    - action_type: str
+    - target_service: optional str
+    - log_filter: optional str
+    - metric_name: optional str
+    - fix_type: optional str
+    - team: optional str
+    - summary_text: optional str
+
+observation_space:
+  type: structured
+  fields:
+    - alerts: list of Alert objects
+    - services: list of ServiceStatus objects
+    - last_action_result: str
+    - last_action_error: optional str
+    - elapsed_minutes: int
+    - steps_taken: int
+    - task_description: str
+    - unlocked_hints: list of str
+
+endpoints:
+  health: GET /health
+  reset:  POST /reset
+  step:   POST /step
+  state:  GET /state
+  ws:     WS /ws
+
+hardware: cpu-basic
+tags:
+  - openenv
+  - incident-response
+  - rl-environment
+  - production-systems
