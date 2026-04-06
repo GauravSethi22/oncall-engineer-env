@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import json
 import textwrap
+import time
 from typing import List, Optional, Set
 from openai import OpenAI
 
@@ -403,7 +404,7 @@ def _step_with_retry(
     Retry env.step() on transient HTTP errors.
     Avoids crashing a whole episode on a brief server hiccup.
     """
-    import time
+
     last_err = None
     for attempt in range(retries):
         try:
