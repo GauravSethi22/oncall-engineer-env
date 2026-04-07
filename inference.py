@@ -21,9 +21,9 @@ if not API_KEY:
         "          export HF_TOKEN=your_token_here   (bash)"
     )
 
-ENV_URL   = os.getenv("ENV_URL", "http://localhost:8000")
-TASKS     = ["easy_crash", "medium_cascade", "hard_corruption"]
-MAX_STEPS = 25
+ENV_URL     = os.getenv("ENV_URL", "http://localhost:8000")
+TASKS       = ["easy_crash", "medium_cascade", "hard_corruption"]
+MAX_STEPS   = 25
 TEMPERATURE = 0.2
 MAX_TOKENS  = 400
 
@@ -79,35 +79,32 @@ Respond with ONE JSON object only. No markdown. Example:
 """).strip()
 
 
+# ─── LOGGING ──────────────────────────────────────────────────────────────────
 
-def log_start(task: str, env: str, model: str):
+def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
 
-def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]):
+
+def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
     error_val = error if error else "null"
-    print(
-        f"[STEP] step={step} action={action} "
-        f"reward={reward:.2f} done={str(done).lower()} error={error_val}",
-        flush=True,
-    )
+    print(f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} error={error_val}", flush=True)
 
-def log_end(success: bool, steps: int, score: float, rewards: List[float]):
+
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(
-        f"[END] success={str(success).lower()} "
-        f"steps={steps} score={score:.2f} rewards={rewards_str}",
-        flush=True,
-    )
+    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
 
+
+# ─── EPISODE MEMORY ───────────────────────────────────────────────────────────
 
 class EpisodeMemory:
     def __init__(self):
-        self.queried_services: Set[str] = set()
-        self.metrics_checked: Set[str]  = set()
-        self.fixes_applied: List[str]   = []
-        self.escalated: bool            = False
-        self.summary_written: bool      = False
-        self.action_history: List[str]  = []
+        self.queried_services: Set[str]  = set()
+        self.metrics_checked: Set[str]   = set()
+        self.fixes_applied: List[str]    = []
+        self.escalated: bool             = False
+        self.summary_written: bool       = False
+        self.action_history: List[str]   = []
         self.metrics_checked_count: dict = {}
 
     def record(self, action: OnCallAction):
@@ -133,6 +130,7 @@ class EpisodeMemory:
         return self.metrics_checked_count.get(service, 0)
 
 
+# ─── PROMPT BUILDER ───────────────────────────────────────────────────────────
 
 def build_user_prompt(
     result: StepResult,
@@ -165,11 +163,10 @@ def build_user_prompt(
         if s not in memory.queried_services
     ]
 
-    steps_taken = obs.steps_taken
+    steps_taken     = obs.steps_taken
     steps_remaining = MAX_STEPS - steps_taken
     nudges = []
 
-    # Block repeated metric checks: the agent should investigate new data or move toward resolution.
     repeated_metrics = [
         svc for svc, count in memory.metrics_checked_count.items()
         if count >= 2
@@ -251,11 +248,11 @@ def build_user_prompt(
         {hints_text}
 
         WHAT YOU HAVE DONE SO FAR:
-          Queried services  : {list(memory.queried_services) or 'none'}
-          Metrics checked   : {list(memory.metrics_checked) or 'none'}
-          Fixes applied     : {memory.fixes_applied or 'none'}
-          Escalated         : {memory.escalated}
-          Summary written   : {memory.summary_written}
+          Queried services        : {list(memory.queried_services) or 'none'}
+          Metrics checked         : {list(memory.metrics_checked) or 'none'}
+          Fixes applied           : {memory.fixes_applied or 'none'}
+          Escalated               : {memory.escalated}
+          Summary written         : {memory.summary_written}
           Services NOT yet checked: {not_queried}
         {nudge_text}
 
@@ -263,6 +260,7 @@ def build_user_prompt(
     """).strip()
 
 
+# ─── ACTION PARSER ────────────────────────────────────────────────────────────
 
 def get_agent_action(
     client: OpenAI,
@@ -295,11 +293,11 @@ def get_agent_action(
             print(
                 f"[DEBUG] Blocking repeated check_metrics on {action.target_service} "
                 f"→ forcing next logical action",
-                flush=True
+                flush=True,
             )
             return _next_logical_action(memory, task_name)
 
-        # Hard override 2: block write_summary before fix applied
+        # Hard override 2: block write_summary before fix is applied
         if action.action_type == "write_summary" and not memory.fixes_applied:
             fix_map = {
                 "easy_crash":      ("payment_service", "rollback"),
@@ -323,7 +321,6 @@ def get_agent_action(
 
 def _next_logical_action(memory: EpisodeMemory, task_name: str) -> OnCallAction:
     """Returns the next logical step when LLM tries to repeat a metric check."""
-    # If the agent has not escalated yet, escalate first before applying any fix.
     if not memory.escalated:
         team_map = {
             "easy_crash":      "deployment_team",
@@ -353,7 +350,6 @@ def _fallback_action(
     memory: EpisodeMemory,
     task_name: str,
 ) -> OnCallAction:
-    # Prefer finalizing the episode once a fix is in place.
     if memory.fixes_applied and not memory.summary_written:
         return OnCallAction(
             action_type="write_summary",
@@ -374,7 +370,7 @@ def _fallback_action(
         )
     all_services = [
         "payment_service", "order_service",
-        "database", "user_service", "notification_service"
+        "database", "user_service", "notification_service",
     ]
     for svc in all_services:
         if svc not in memory.queried_services:
@@ -392,17 +388,15 @@ def _fallback_action(
     return OnCallAction(action_type="apply_fix", target_service=svc, fix_type=fix)
 
 
+# ─── RETRY WRAPPER ────────────────────────────────────────────────────────────
+
 def _step_with_retry(
     env: OnCallEnv,
     action: OnCallAction,
     retries: int = 3,
     delay: float = 2.0,
 ) -> StepResult:
-    """
-    Retry env.step() on transient HTTP errors.
-    Avoids crashing a whole episode on a brief server hiccup.
-    """
-
+    """Retry env.step() on transient HTTP errors."""
     last_err = None
     for attempt in range(retries):
         try:
@@ -411,7 +405,7 @@ def _step_with_retry(
             last_err = e
             if attempt < retries - 1:
                 print(
-                    f"[DEBUG] step() failed (attempt {attempt+1}/{retries}): "
+                    f"[DEBUG] step() failed (attempt {attempt + 1}/{retries}): "
                     f"{e} — retrying in {delay}s",
                     flush=True,
                 )
@@ -419,6 +413,7 @@ def _step_with_retry(
     raise last_err
 
 
+# ─── EPISODE RUNNER ───────────────────────────────────────────────────────────
 
 def run_episode(
     env: OnCallEnv,
@@ -428,58 +423,66 @@ def run_episode(
 
     result = env.reset_with_task(task_name)
 
-    memory  = EpisodeMemory()
+    memory      = EpisodeMemory()
     rewards: List[float] = []
     steps_taken = 0
+    success     = False
+    score       = 0.0
 
     log_start(task=task_name, env="oncall_engineer", model=MODEL_NAME)
 
-    for step in range(1, MAX_STEPS + 1):
-        if result.done:
-            break
+    try:
+        for step in range(1, MAX_STEPS + 1):
+            if result.done:
+                break
 
-        if step == MAX_STEPS and not memory.summary_written:
-            action = OnCallAction(
-                action_type="write_summary",
-                summary_text=(
-                    f"Incident summary for {task_name}. "
-                    f"Investigated: {list(memory.queried_services)}. "
-                    f"Fixes: {memory.fixes_applied}."
-                ),
-            )
-        else:
-            action = get_agent_action(client, result, step, memory, task_name)
+            if step == MAX_STEPS and not memory.summary_written:
+                action = OnCallAction(
+                    action_type="write_summary",
+                    summary_text=(
+                        f"Incident summary for {task_name}. "
+                        f"Investigated: {list(memory.queried_services)}. "
+                        f"Fixes: {memory.fixes_applied}."
+                    ),
+                )
+            else:
+                action = get_agent_action(client, result, step, memory, task_name)
 
-        memory.record(action)
+            memory.record(action)
 
-        action_str = json.dumps({
-            k: v for k, v in {
-                "type":    action.action_type,
-                "service": action.target_service,
-                "fix":     action.fix_type,
-                "team":    action.team,
-            }.items() if v
-        })
+            action_str = json.dumps({
+                k: v for k, v in {
+                    "type":    action.action_type,
+                    "service": action.target_service,
+                    "fix":     action.fix_type,
+                    "team":    action.team,
+                }.items() if v
+            })
 
-        result      = _step_with_retry(env, action)
-        reward      = result.reward or 0.0
-        done        = result.done
-        error       = result.observation.last_action_error
+            result  = _step_with_retry(env, action)
+            reward  = result.reward or 0.0
+            done    = result.done
+            error   = result.observation.last_action_error
 
-        rewards.append(reward)
-        steps_taken = step
+            rewards.append(reward)
+            steps_taken = step
 
-        log_step(step=step, action=action_str, reward=reward, done=done, error=error)
+            log_step(step=step, action=action_str, reward=reward, done=done, error=error)
 
-        if done:
-            break
+            if done:
+                break
 
-    success = result.state.correct_fix_applied
-    score = rewards[-1] if rewards else 0.0
-    log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+        success = result.state.correct_fix_applied
+        score   = min(max(float(result.state.current_score), 0.0), 1.0)
+
+    finally:
+        # Guaranteed to always emit [END] even if an exception occurs mid-episode
+        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+
     return success, steps_taken, rewards
 
 
+# ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 def main():
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
@@ -489,7 +492,6 @@ def main():
                 run_episode(env, client, task_name)
             except Exception as e:
                 print(f"[DEBUG] Episode failed for {task_name}: {e}", flush=True)
-                log_end(success=False, steps=0, score=0.0, rewards=[])
 
 
 if __name__ == "__main__":
