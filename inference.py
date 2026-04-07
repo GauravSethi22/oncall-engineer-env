@@ -91,15 +91,13 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
         flush=True,
     )
 
-def log_end(success: bool, steps: int, rewards: List[float]):
+def log_end(success: bool, steps: int, score: float, rewards: List[float]):
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    score = rewards[-1] if rewards else 0.0
     print(
         f"[END] success={str(success).lower()} "
         f"steps={steps} score={score:.2f} rewards={rewards_str}",
         flush=True,
     )
-
 
 
 class EpisodeMemory:
@@ -477,7 +475,8 @@ def run_episode(
             break
 
     success = result.state.correct_fix_applied
-    log_end(success=success, steps=steps_taken, rewards=rewards)
+    score = rewards[-1] if rewards else 0.0
+    log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
     return success, steps_taken, rewards
 
 
@@ -490,7 +489,7 @@ def main():
                 run_episode(env, client, task_name)
             except Exception as e:
                 print(f"[DEBUG] Episode failed for {task_name}: {e}", flush=True)
-                log_end(success=False, steps=0, rewards=[])
+                log_end(success=False, steps=0, score=0.0, rewards=[])
 
 
 if __name__ == "__main__":
