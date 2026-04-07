@@ -52,7 +52,7 @@ uvicorn server.app:app --host 0.0.0.0 --port 8000 --reload
 export HF_TOKEN=your_api_key
 export API_BASE_URL=https://api.groq.com/openai/v1
 export MODEL_NAME=llama-3.3-70b-versatile
-export ENV_URL=https://gaurav206-oncall-engineer-env.hf.space
+export ENV_URL=https://Gaurav206-oncall-engineer-env.hf.space
 python inference.py
 ```
 
