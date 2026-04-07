@@ -5,6 +5,8 @@ colorFrom: red
 colorTo: yellow
 sdk: docker
 pinned: false
+tags:
+  - openenv
 ---
 
 # OnCall Engineer Environment
