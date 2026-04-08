@@ -22,12 +22,12 @@ from openai import OpenAI
 from client import OnCallEnv, StepResult
 from models import OnCallAction
 
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.groq.com/openai/v1")
-MODEL_NAME   = os.getenv("MODEL_NAME",   "llama-3.3-70b-versatile")
+API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.groq.com/openai/v1")
+MODEL_NAME   = os.environ.get("MODEL_NAME",   "llama-3.3-70b-versatile")
 
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or "placeholder-key"
+API_KEY = os.environ.get("API_KEY", "placeholder-key")
 
-ENV_URL     = os.getenv("ENV_URL", "http://localhost:8000")
+ENV_URL     = os.environ.get("ENV_URL", "http://localhost:8000")
 TASKS       = ["easy_crash", "medium_cascade", "hard_corruption"]
 MAX_STEPS   = 25
 TEMPERATURE = 0.2
@@ -491,7 +491,13 @@ def run_episode(
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 def main():
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    if "API_BASE_URL" in os.environ and "API_KEY" in os.environ:
+        client = OpenAI(
+            base_url=os.environ["API_BASE_URL"],
+            api_key=os.environ["API_KEY"]
+        )
+    else:
+        client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
     # Print [START] for ALL tasks immediately before any network calls.
     # This guarantees stdout has content even if connections fail.
