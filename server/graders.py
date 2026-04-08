@@ -112,13 +112,13 @@ class EasyCrashGrader(BaseGrader):
     KEYWORDS = ["payment_service", "v2.1.3", "rollback", "deployment"]
 
     def grade(self, tracker: EpisodeTracker) -> GradeResult:
-        breakdown = {}
+        breakdown = {"base_score": 0.01}
 
         correct_fix = any(
             f["service"] == "payment_service" and f["fix_type"] == "rollback"
             for f in tracker.fixes_attempted
         )
-        breakdown["correct_fix"] = 0.30 if correct_fix else 0.0
+        breakdown["correct_fix"] = 0.29 if correct_fix else 0.0
 
         # Penalty if made things worse (tried restart instead of rollback first)
         bad_fix = any(
@@ -152,7 +152,7 @@ class EasyCrashGrader(BaseGrader):
             breakdown["speed"] = 0.0
 
         correct_escalation = "deployment_team" in tracker.escalations
-        breakdown["escalation"] = 0.10 if correct_escalation else 0.0
+        breakdown["escalation"] = 0.09 if correct_escalation else 0.0
 
         total = round(sum(breakdown.values()), 3)
         total = max(0.01, min(0.99, total))
@@ -210,13 +210,13 @@ class MediumCascadeGrader(BaseGrader):
     CHAIN = ["order_service", "payment_service", "database"]
 
     def grade(self, tracker: EpisodeTracker) -> GradeResult:
-        breakdown = {}
+        breakdown = {"base_score": 0.01}
 
         correct_fix = any(
             f["service"] == "payment_service" and f["fix_type"] == "restart"
             for f in tracker.fixes_attempted
         )
-        breakdown["correct_fix"] = 0.30 if correct_fix else 0.0
+        breakdown["correct_fix"] = 0.29 if correct_fix else 0.0
 
         # Penalty: restarting database is harmful
         db_restart = any(
@@ -256,7 +256,7 @@ class MediumCascadeGrader(BaseGrader):
             breakdown["speed"] = 0.0
 
         breakdown["escalation"] = (
-            0.10 if "database_team" in tracker.escalations else 0.0
+            0.09 if "database_team" in tracker.escalations else 0.0
         )
 
         total = round(sum(breakdown.values()), 3)
@@ -317,13 +317,13 @@ class HardCorruptionGrader(BaseGrader):
     ]
 
     def grade(self, tracker: EpisodeTracker) -> GradeResult:
-        breakdown = {}
+        breakdown = {"base_score": 0.01}
 
         correct_fix = any(
             f["service"] == "order_service" and f["fix_type"] == "rollback"
             for f in tracker.fixes_attempted
         )
-        breakdown["correct_fix"] = 0.30 if correct_fix else 0.0
+        breakdown["correct_fix"] = 0.29 if correct_fix else 0.0
 
         queried_order = "order_service" in tracker.services_queried
         queried_db = "database" in tracker.services_queried
@@ -361,7 +361,7 @@ class HardCorruptionGrader(BaseGrader):
             breakdown["speed"] = 0.0
 
         breakdown["escalation"] = (
-            0.10 if "data_team" in tracker.escalations else 0.0
+            0.09 if "data_team" in tracker.escalations else 0.0
         )
 
         total = round(sum(breakdown.values()), 3)
