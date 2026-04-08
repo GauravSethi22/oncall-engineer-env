@@ -5,6 +5,18 @@ import json
 import textwrap
 import time
 from typing import List, Optional, Set
+import sys
+import subprocess
+
+def _ensure_deps():
+    for pkg in ["openai", "requests", "websockets"]:
+        try:
+            __import__(pkg)
+        except ImportError:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", pkg, "--quiet"])
+
+_ensure_deps()
+
 from openai import OpenAI
 
 from client import OnCallEnv, StepResult
