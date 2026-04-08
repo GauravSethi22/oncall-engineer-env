@@ -74,7 +74,7 @@ def _obs_to_dict(obs, reward, done, state) -> Dict[str, Any]:
             "task_name": obs.task_name,
             "unlocked_hints": obs.unlocked_hints,
         },
-        "reward": reward,
+        "reward": max(0.01, min(0.99, reward)),
         "done": done,
         "state": {
             "episode_id": state.episode_id,
@@ -84,7 +84,7 @@ def _obs_to_dict(obs, reward, done, state) -> Dict[str, Any]:
             "incident_resolved": state.incident_resolved,
             "root_cause_identified": state.root_cause_identified,
             "correct_fix_applied": state.correct_fix_applied,
-            "current_score": state.current_score,
+            "current_score": max(0.01, min(0.99, state.current_score)),
             "max_steps": state.max_steps,
             "elapsed_minutes": state.elapsed_minutes,
         },
@@ -139,7 +139,7 @@ def get_state():
         "step_count": s.step_count,
         "task_name": s.task_name,
         "task_difficulty": s.task_difficulty,
-        "current_score": s.current_score,
+        "current_score": max(0.01, min(0.99, s.current_score)),
         "max_steps": s.max_steps,
     }
 
@@ -186,7 +186,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     "episode_id": s.episode_id,
                     "step_count": s.step_count,
                     "task_name": s.task_name,
-                    "current_score": s.current_score,
+                    "current_score": max(0.01, min(0.99, s.current_score)),
                 })
 
             else:

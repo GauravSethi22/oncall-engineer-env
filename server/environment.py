@@ -37,14 +37,14 @@ class OnCallEnvironment:
         self.tracker = EpisodeTracker(task_name=self.task_name)
         self.episode_id = str(uuid.uuid4())[:8]
         self._done = False
-        self._current_score = 0.0
+        self._current_score = 0.01
 
         obs = self._build_observation(
             last_action_result="Incident started. Investigate and resolve.",
             last_action_error=None,
         )
         state = self._build_state()
-        return obs, 0.0, False, state
+        return obs, 0.01, False, state
 
     def step(
         self, action: OnCallAction
@@ -56,7 +56,7 @@ class OnCallEnvironment:
                 last_action_result="Episode already finished.",
                 last_action_error="Episode is done. Call reset() to start again.",
             )
-            return obs, 0.0, True, self._build_state()
+            return obs, 0.01, True, self._build_state()
 
         self.tracker.steps_taken += 1
         self.tracker.actions_taken.append({
@@ -87,6 +87,9 @@ class OnCallEnvironment:
         # On final step give full score as reward so the agent is motivated to finish.
         if self._done:
             reward = grade.score
+
+        # SAFETY: Clamp reward to strictly (0, 1) — validator rejects 0.0 and 1.0
+        reward = max(0.01, min(0.99, reward))
 
         obs = self._build_observation(
             last_action_result=result,
@@ -273,6 +276,8 @@ class OnCallEnvironment:
     def _build_state(self, grade_feedback: str = "") -> OnCallState:
         grader = get_grader(self.task_name)
         grade = grader.grade(self.tracker)
+        # SAFETY: Clamp score to strictly (0, 1) — validator rejects 0.0 and 1.0
+        clamped_score = max(0.01, min(0.99, grade.score))
         return OnCallState(
             episode_id=self.episode_id,
             step_count=self.tracker.steps_taken,
@@ -281,7 +286,7 @@ class OnCallEnvironment:
             incident_resolved=grade.incident_resolved,
             root_cause_identified=grade.root_cause_identified,
             correct_fix_applied=grade.correct_fix_applied,
-            current_score=grade.score,
+            current_score=clamped_score,
             max_steps=self.task.max_steps,
             elapsed_minutes=self.simulator.elapsed_minutes,
         )
