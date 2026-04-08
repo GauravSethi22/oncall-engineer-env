@@ -65,11 +65,13 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
     print(f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} error={error_val}", flush=True)
 
 # 3. FIXED: Added the mandatory 'score' field to the [END] log
-def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
-    if not rewards:
-        rewards = [0.01]
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
+def log_end(success: bool, steps: int, score: float, rewards: List[float]):
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.01"
+    print(
+        f"[END] success={str(success).lower()} "
+        f"steps={steps} score={score:.2f} rewards={rewards_str}",
+        flush=True,
+    )
 
 # ─── EPISODE MEMORY ───────────────────────────────────────────────────────────
 
@@ -186,10 +188,10 @@ def run_episode(env: OnCallEnv, client: OpenAI, task_name: str):
             if result.done: break
             action = get_agent_action(client, result, step, memory, task_name)
             memory.record(action)
-            
+
             action_str = json.dumps({"type": action.action_type, "svc": action.target_service})
             result = _step_with_retry(env, action)
-            
+
             reward = result.reward or 0.0
             reward = max(0.01, min(0.99, reward))
             rewards.append(reward)
@@ -199,8 +201,9 @@ def run_episode(env: OnCallEnv, client: OpenAI, task_name: str):
 
         success = getattr(result.state, "correct_fix_applied", False)
     finally:
-        # Score calculation: Ensure score is strictly between 0 and 1 (0.0 < score < 1.0)
-        raw_score = 1.0 if success else sum(rewards)
+        # Use mean reward for failed episodes, 0.99 for success
+        # sum() can exceed 0.99 over many steps — mean stays in range
+        raw_score = 0.99 if success else (sum(rewards) / len(rewards) if rewards else 0.01)
         score = max(0.01, min(0.99, raw_score))
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
