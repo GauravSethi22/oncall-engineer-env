@@ -83,13 +83,11 @@ class BaseGrader:
         Partial credit for investigating the right service.
         Penalises querying too many irrelevant services.
         """
-        # Avoid rewarding random exploration; only the correct service earns positive credit.
         if correct_service in services_queried:
             relevant = 1
         else:
             relevant = 0
 
-        # Penalise excessive noise (querying everything blindly)
         noise = len(set(services_queried)) - relevant
         noise_penalty = min(noise * 0.05, 0.3)
 
@@ -99,13 +97,6 @@ class BaseGrader:
 class EasyCrashGrader(BaseGrader):
     """
     Grades the easy_crash scenario.
-
-    Scoring breakdown:
-      30%  Correct fix applied (rollback payment_service)
-      25%  Root cause identified (queried payment_service logs)
-      20%  Summary quality (keywords: payment_service, v2.1.3, rollback)
-      15%  Speed bonus
-      10%  Escalated to correct team
     """
 
     MAX_STEPS = 15
@@ -120,7 +111,6 @@ class EasyCrashGrader(BaseGrader):
         )
         breakdown["correct_fix"] = 0.30 if correct_fix else 0.0
 
-        # Penalty if made things worse (tried restart instead of rollback first)
         bad_fix = any(
             f["service"] == "payment_service" and f["fix_type"] == "restart"
             for f in tracker.fixes_attempted
@@ -155,7 +145,8 @@ class EasyCrashGrader(BaseGrader):
         breakdown["escalation"] = 0.10 if correct_escalation else 0.0
 
         total = round(sum(breakdown.values()), 3)
-        total = max(0.0, min(1.0, total))
+        # FIXED: Ensure score is strictly within (0, 1)
+        total = max(0.01, min(0.99, total))
 
         return GradeResult(
             score=total,
@@ -188,21 +179,9 @@ class EasyCrashGrader(BaseGrader):
         return " ".join(parts)
 
 
-
-
 class MediumCascadeGrader(BaseGrader):
     """
     Grades the medium_cascade scenario.
-
-    This task rewards tracing the cascade chain, not just
-    fixing the first symptomatic service.
-
-    Scoring breakdown:
-      30%  Correct fix applied (restart payment_service)
-      25%  Traced the full cascade chain (order→payment→database)
-      20%  Summary quality
-      15%  Speed bonus
-      10%  Correct escalation (database_team)
     """
 
     MAX_STEPS = 20
@@ -218,7 +197,6 @@ class MediumCascadeGrader(BaseGrader):
         )
         breakdown["correct_fix"] = 0.30 if correct_fix else 0.0
 
-        # Penalty: restarting database is harmful
         db_restart = any(
             f["service"] == "database" and f["fix_type"] == "restart"
             for f in tracker.fixes_attempted
@@ -260,7 +238,8 @@ class MediumCascadeGrader(BaseGrader):
         )
 
         total = round(sum(breakdown.values()), 3)
-        total = max(0.0, min(1.0, total))
+        # FIXED: Ensure score is strictly within (0, 1)
+        total = max(0.01, min(0.99, total))
 
         return GradeResult(
             score=total,
@@ -293,21 +272,9 @@ class MediumCascadeGrader(BaseGrader):
         return " ".join(parts)
 
 
-
-
 class HardCorruptionGrader(BaseGrader):
     """
     Grades the hard_corruption scenario.
-
-    This is the hardest because there are no obvious alerts.
-    The agent must proactively investigate and find silent corruption.
-
-    Scoring breakdown:
-      30%  Correct fix applied (rollback order_service)
-      25%  Found the corruption source (queried order logs + database job logs)
-      20%  Summary quality
-      15%  Speed bonus
-      10%  Correct escalation (data_team)
     """
 
     MAX_STEPS = 25
@@ -365,7 +332,8 @@ class HardCorruptionGrader(BaseGrader):
         )
 
         total = round(sum(breakdown.values()), 3)
-        total = max(0.0, min(1.0, total))
+        # FIXED: Ensure score is strictly within (0, 1)
+        total = max(0.01, min(0.99, total))
 
         return GradeResult(
             score=total,
@@ -402,7 +370,6 @@ class HardCorruptionGrader(BaseGrader):
         else:
             parts.append("Summary was missing or weak.")
         return " ".join(parts)
-
 
 
 GRADERS = {
