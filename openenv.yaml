@@ -13,19 +13,19 @@ tasks:
     difficulty: easy
     description: Payment service crashed after a bad deployment. Find and rollback.
     max_steps: 15
-    score_range: [0, 1]
+    score_range: [0.01, 0.99]
 
   - name: medium_cascade
     difficulty: medium
     description: Cascading failure caused by database connection exhaustion. Trace root cause.
     max_steps: 20
-    score_range: [0, 1]
+    score_range: [0.01, 0.99]
 
   - name: hard_corruption
     difficulty: hard
     description: Silent data corruption with no alerts. Proactively investigate.
     max_steps: 25
-    score_range: [0, 1]
+    score_range: [0.01, 0.99]
 
 action_space:
   type: structured
