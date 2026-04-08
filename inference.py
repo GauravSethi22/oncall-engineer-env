@@ -457,7 +457,7 @@ def run_episode(
                     "fix":     action.fix_type,
                     "team":    action.team,
                 }.items() if v
-            })
+            }, separators=(',', ':'))
 
             result  = _step_with_retry(env, action)
             reward  = result.reward or 0.0
