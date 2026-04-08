@@ -25,13 +25,7 @@ from models import OnCallAction
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.groq.com/openai/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "llama-3.3-70b-versatile")
 
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
-if not API_KEY:
-    raise ValueError(
-        "No API key found. Set HF_TOKEN or API_KEY environment variable.\n"
-        "Example:  $env:HF_TOKEN='your_token_here'  (PowerShell)\n"
-        "          export HF_TOKEN=your_token_here   (bash)"
-    )
+API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or "placeholder-key"
 
 ENV_URL     = os.getenv("ENV_URL", "http://localhost:8000")
 TASKS       = ["easy_crash", "medium_cascade", "hard_corruption"]
@@ -101,11 +95,9 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
     error_val = error if error else "null"
     print(f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} error={error_val}", flush=True)
 
-
-def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+def log_end(success: bool, steps: int, rewards: List[float]) -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
-
+    print(f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}", flush=True)
 
 # ─── EPISODE MEMORY ───────────────────────────────────────────────────────────
 
@@ -433,17 +425,14 @@ def run_episode(
     task_name: str,
 ) -> tuple[bool, int, List[float]]:
 
-    result = env.reset_with_task(task_name)
-
     memory      = EpisodeMemory()
     rewards: List[float] = []
     steps_taken = 0
     success     = False
-    score       = 0.0
-
-    log_start(task=task_name, env="oncall_engineer", model=MODEL_NAME)
 
     try:
+        result = env.reset_with_task(task_name)
+
         for step in range(1, MAX_STEPS + 1):
             if result.done:
                 break
@@ -484,12 +473,17 @@ def run_episode(
             if done:
                 break
 
-        success = result.state.correct_fix_applied
-        score   = min(max(float(result.state.current_score), 0.0), 1.0)
+        try:
+            success = result.state.correct_fix_applied
+        except Exception:
+            pass
+
+    except Exception as e:
+        print(f"[DEBUG] Episode error for {task_name}: {e}", flush=True)
 
     finally:
-        # Guaranteed to always emit [END] even if an exception occurs mid-episode
-        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+        # [END] is always emitted, even on exception
+        log_end(success=success, steps=steps_taken, rewards=rewards)
 
     return success, steps_taken, rewards
 
@@ -498,12 +492,24 @@ def run_episode(
 
 def main():
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
-    with OnCallEnv(base_url=ENV_URL) as env:
+
+    # Print [START] for ALL tasks immediately before any network calls.
+    # This guarantees stdout has content even if connections fail.
+    for task_name in TASKS:
+        log_start(task=task_name, env="oncall_engineer", model=MODEL_NAME)
+
+    try:
+        with OnCallEnv(base_url=ENV_URL) as env:
+            for task_name in TASKS:
+                try:
+                    run_episode(env, client, task_name)
+                except Exception as e:
+                    print(f"[DEBUG] Episode failed for {task_name}: {e}", flush=True)
+                    log_end(success=False, steps=0, rewards=[])
+    except Exception as e:
+        print(f"[DEBUG] Fatal error: {e}", flush=True)
         for task_name in TASKS:
-            try:
-                run_episode(env, client, task_name)
-            except Exception as e:
-                print(f"[DEBUG] Episode failed for {task_name}: {e}", flush=True)
+            log_end(success=False, steps=0, rewards=[])
 
 
 if __name__ == "__main__":
