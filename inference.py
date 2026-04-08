@@ -12,7 +12,6 @@ from client import OnCallEnv, StepResult
 from models import OnCallAction
 
 # 1. FIXED: Removed hardcoded API defaults and runtime dependencies
-# Fetches mandatory environment variables as required by the platform
 API_BASE_URL = os.environ.get("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME   = os.environ.get("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
 API_KEY      = os.environ.get("HF_TOKEN") or os.environ.get("API_KEY")
@@ -135,7 +134,6 @@ def get_agent_action(client: OpenAI, result: StepResult, step: int, memory: Epis
         data = json.loads(text)
         action = OnCallAction(**data)
         
-        # Guardrails: block repeated metrics
         if action.action_type == "check_metrics" and memory.times_metric_checked(action.target_service) >= 1:
             return _next_logical_action(memory, task_name)
         return action
@@ -182,8 +180,9 @@ def run_episode(env: OnCallEnv, client: OpenAI, task_name: str):
 
         success = getattr(result.state, "correct_fix_applied", False)
     finally:
-        # Score calculation: Each task returns score in [0, 1]
-        score = 1.0 if success else min(sum(rewards), 1.0)
+        # Score calculation: Ensure score is strictly between 0 and 1 (0.0 < score < 1.0)
+        raw_score = 1.0 if success else sum(rewards)
+        score = max(0.01, min(0.99, raw_score))
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
@@ -201,10 +200,15 @@ def main():
     try:
         with OnCallEnv(base_url=ENV_URL) as env:
             for task_name in TASKS:
-                try: run_episode(env, client, task_name)
-                except Exception: log_end(success=False, steps=0, score=0.0, rewards=[])
+                try: 
+                    run_episode(env, client, task_name)
+                except Exception: 
+                    # Score must be strictly > 0.0
+                    log_end(success=False, steps=0, score=0.01, rewards=[])
     except Exception:
-        for task_name in TASKS: log_end(success=False, steps=0, score=0.0, rewards=[])
+        for task_name in TASKS: 
+            # Score must be strictly > 0.0
+            log_end(success=False, steps=0, score=0.01, rewards=[])
 
 if __name__ == "__main__":
     main()
